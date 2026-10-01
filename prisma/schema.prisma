@@ -1,0 +1,306 @@
+// LumiStream — OTT platform data model
+//
+// PostgreSQL is the only supported provider: the free deploy targets a hosted
+// Postgres (Neon, see FREE_DEPLOY.md) because a serverless filesystem is
+// ephemeral and cannot hold a SQLite file.
+//
+// Two things follow from the move off SQLite:
+//  - `enum` is still modelled as `String` (validated in `lib/constants.ts`) so
+//    the shape stays portable across providers.
+//  - `Json` IS now supported, so every blob that used to be a serialised
+//    string is a real `jsonb` column: `Package.features`, `AuditLog.meta`,
+//    `AnalyticsEvent.meta` and `Payment.metadata`.
+//
+// Comma-separated lists (`Channel.tags`, `Content.genres`, `Content.cast`) are
+// intentionally left as `String` — they are display lists, not documents, and
+// `splitList()` in `lib/utils.ts` reads them.
+//
+// For a throwaway local database:  docker compose up -d
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  firstName     String
+  lastName      String
+  email         String    @unique
+  password      String
+  phone         String?
+  role          String    @default("user") // user | admin
+  avatar        String?
+  isActive      Boolean   @default(true)
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  subscriptions  Subscription[]
+  payments       Payment[]
+  favorites      Favorite[]
+  tickets        SupportTicket[]
+  passwordTokens PasswordResetToken[]
+  auditLogs      AuditLog[]
+  analytics      AnalyticsEvent[]
+
+  @@index([role])
+  @@index([createdAt])
+}
+
+model Language {
+  id         String   @id @default(cuid())
+  code       String   @unique // ar | en | fr | es
+  name       String // English name
+  nativeName String // Endonym
+  dir        String   @default("ltr")
+  isDefault  Boolean  @default(false)
+  isActive   Boolean  @default(true)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Setting {
+  key       String   @id
+  value     String
+  group     String   @default("general")
+  updatedAt DateTime @updatedAt
+}
+
+model Channel {
+  id              String   @id @default(cuid())
+  slug            String   @unique
+  name            String
+  description     String?
+  logo            String?
+  poster          String?
+  streamUrl       String
+  fallbackUrl     String?
+  trailerUrl      String?
+  country         String?
+  countryCode     String?
+  language        String?
+  category        String   @default("general")
+  quality         String   @default("HD")
+  tags            String? // comma separated
+  isLive          Boolean  @default(true)
+  isActive        Boolean  @default(true)
+  isFeatured      Boolean  @default(false)
+  sortOrder       Int      @default(0)
+  viewCount       Int      @default(0)
+  subscriberCount Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  packages  PackageChannel[]
+  favorites Favorite[]
+  analytics AnalyticsEvent[]
+
+  @@index([category])
+  @@index([isActive, isFeatured])
+  @@index([country])
+  @@index([language])
+}
+
+model Content {
+  id            String    @id @default(cuid())
+  slug          String    @unique
+  title         String
+  originalTitle String?
+  type          String    @default("movie") // movie | series | documentary
+  description   String?
+  poster        String?
+  backdrop      String?
+  videoUrl      String?
+  trailerUrl    String?
+  year          Int?
+  duration      Int? // minutes
+  ageRating     String?
+  rating        Float     @default(0)
+  genres        String? // comma separated
+  director      String?
+  cast          String? // comma separated
+  releaseDate   DateTime?
+  isVod         Boolean   @default(true)
+  isActive      Boolean   @default(true)
+  isFeatured    Boolean   @default(false)
+  sortOrder     Int       @default(0)
+  viewCount     Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([type])
+  @@index([isActive, isFeatured])
+  @@index([year])
+}
+
+model Package {
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  name          String
+  description   String?
+  image         String?
+  price         Float
+  currency      String   @default("EUR")
+  durationDays  Int
+  durationLabel String?
+  features      Json? // jsonb array of strings — read with asStringArray()
+  maxDevices    Int      @default(1)
+  isActive      Boolean  @default(true)
+  isPopular     Boolean  @default(false)
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  channels      PackageChannel[]
+  subscriptions Subscription[]
+  payments      Payment[]
+
+  @@index([isActive, sortOrder])
+}
+
+model PackageChannel {
+  packageId String
+  channelId String
+
+  package Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@id([packageId, channelId])
+  @@index([channelId])
+}
+
+model Subscription {
+  id        String    @id @default(cuid())
+  userId    String
+  packageId String
+  status    String    @default("pending") // active | expired | pending | cancelled
+  startDate DateTime?
+  endDate   DateTime?
+  autoRenew Boolean   @default(false)
+  paymentId String?
+  notes     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  package Package  @relation(fields: [packageId], references: [id])
+  payment Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+  @@index([endDate])
+}
+
+model Payment {
+  id            String    @id @default(cuid())
+  reference     String    @unique
+  userId        String
+  packageId     String
+  amount        Float
+  currency      String    @default("EUR")
+  status        String    @default("pending") // pending | paid | failed | refunded
+  provider      String    @default("manual")
+  providerRef   String?
+  method        String?
+  invoiceNo     String?
+  failureReason String?
+  metadata      Json?
+  paidAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  package      Package       @relation(fields: [packageId], references: [id])
+  subscription Subscription[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  channelId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, channelId])
+  @@index([userId])
+}
+model SupportTicket {
+  id        String    @id @default(cuid())
+  userId    String?
+  name      String
+  email     String
+  phone     String?
+  subject   String
+  message   String
+  status    String    @default("open") // open | in_progress | resolved | closed
+  priority  String    @default("normal") // low | normal | high | urgent
+  reply     String?
+  repliedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  actorName String?
+  action    String
+  entity    String?
+  entityId  String?
+  meta      Json?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([action])
+}
+
+model AnalyticsEvent {
+  id        String   @id @default(cuid())
+  type      String // page_view | search | play | signup | subscribe | login | contact
+  path      String?
+  query     String?
+  userId    String?
+  channelId String?
+  meta      Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  channel Channel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
+
+  @@index([type])
+  @@index([createdAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}

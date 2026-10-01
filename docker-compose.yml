@@ -1,0 +1,34 @@
+# Local PostgreSQL for development.
+#
+#   docker compose up -d     start (first run downloads ~400 MB)
+#   docker compose down      stop
+#   docker compose down -v   stop and delete the volume
+#
+# The credentials below are deliberately throwaway — they match the local
+# DATABASE_URL in .env and must never be used anywhere else.
+#
+# Prefer not to install Docker? Skip this file entirely and point your local
+# DATABASE_URL at the free Neon database instead (see FREE_DEPLOY.md). One
+# schema, one database, zero setup.
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: lumistream-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: lumistream
+      POSTGRES_PASSWORD: lumistream
+      POSTGRES_DB: lumistream
+    ports:
+      - "5432:5432"
+    volumes:
+      - lumistream-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lumistream -d lumistream"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  lumistream-pgdata:
