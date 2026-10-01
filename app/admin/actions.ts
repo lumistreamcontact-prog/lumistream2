@@ -19,7 +19,7 @@ import {
   validateName,
   validatePassword,
 } from "@/lib/validation";
-import { slugify, splitLines } from "@/lib/utils";
+import { slugify, splitLines, normalizeWhatsApp } from "@/lib/utils";
 import {
   BUNDLED_LOCALES,
   CATEGORIES,
@@ -96,8 +96,15 @@ export async function saveSettingsAction(fd: FormData): Promise<void> {
   ] as const) {
     if (raw[key]) raw[key] = sanitizeUrl(raw[key]) ?? "";
   }
-  for (const key of ["siteName", "siteTagline", "supportEmail", "whatsappNumber"] as const) {
+  for (const key of ["siteName", "siteTagline", "supportEmail"] as const) {
     if (raw[key]) raw[key] = sanitizeText(raw[key], key === "siteTagline" ? 160 : 200);
+  }
+  // The WhatsApp number is stored digits-only: an admin pasting "+212 786-172 756"
+  // must still produce a valid `wa.me` link. Anything that is not 8-15 digits is
+  // dropped rather than persisted as a dead link across the whole site.
+  if (raw.whatsappNumber !== undefined) {
+    const digits = normalizeWhatsApp(raw.whatsappNumber);
+    raw.whatsappNumber = digits.length >= 8 && digits.length <= 15 ? digits : "";
   }
   for (const key of ["siteDescription", "footerText", "footerDisclaimer"] as const) {
     if (raw[key] !== undefined) raw[key] = sanitizeText(raw[key], 2000);
@@ -121,6 +128,10 @@ export async function saveSettingsAction(fd: FormData): Promise<void> {
   });
 
   for (const path of SETTING_PATHS) revalidatePath(path);
+  // Settings are read in the root layout, which renders the header, the footer
+  // and the WhatsApp FAB on every page. Invalidating the `/` page alone would
+  // leave those stale, so revalidate the layout itself and everything under it.
+  revalidatePath("/", "layout");
 }
 
 /* ------------------------------------------------------------------ */

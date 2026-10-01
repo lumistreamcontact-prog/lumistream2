@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useSite } from "@/components/providers/SiteProvider";
 import { MailIcon, PhoneIcon, WhatsAppIcon } from "@/components/ui/Icons";
-import { waLink } from "@/lib/utils";
+import { formatWhatsApp, waLink } from "@/lib/utils";
 
 /** Social links rendered as filled paths so no icon library is needed. */
 const SOCIALS = [
@@ -116,7 +116,7 @@ return (
                     className="flex items-center gap-2.5 text-muted transition-colors hover:text-[#25D366]"
                   >
                     <WhatsAppIcon className="h-4 w-4 shrink-0 text-[#25D366]" />
-                    +{settings.whatsappNumber}
+                    {formatWhatsApp(settings.whatsappNumber)}
                   </a>
                 </li>
               )}

@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { getDictionary } from "@/lib/i18n";
-import { getSettings, SETTING_GROUPS } from "@/lib/settings";
+import { getSettings } from "@/lib/settings";
 import { SettingsForm, type SettingField } from "@/components/admin/SettingsForm";
+import { WhatsAppCard } from "@/components/admin/WhatsAppCard";
 import { PageHeader, SectionHeader } from "@/components/ui/Primitives";
 import { CURRENCIES, DEFAULT_LANGUAGES } from "@/lib/constants";
 
@@ -38,8 +39,12 @@ const HERO: SettingField[] = [
   { name: "heroWhatsappLabel", labelKey: "admin.heroWhatsappLabel", kind: "text", span: 2 },
 ];
 
+/**
+ * `whatsappNumber` is deliberately absent from this list: it has its own card at
+ * the top of the page with validation and a live link preview, and two inputs
+ * writing the same setting would let the two cards silently overwrite each other.
+ */
 const CONTACT: SettingField[] = [
-  { name: "whatsappNumber", labelKey: "admin.whatsappNumber", kind: "text" },
   { name: "supportEmail", labelKey: "admin.supportEmail", kind: "text" },
   { name: "phone", labelKey: "admin.phone", kind: "text" },
   { name: "address", labelKey: "admin.address", kind: "textarea", span: 2 },
@@ -70,27 +75,28 @@ const GROUPS = [
 
 export default async function SettingsAdminPage() {
   const [{ t }, settings] = await Promise.all([getDictionary(), getSettings()]);
+  const values = settings as unknown as Record<string, string>;
 
   return (
     <div className="max-w-4xl">
-      <PageHeader title={t("admin.settings")} description={t("packages.securePayment")} />
+      <PageHeader title={t("admin.settings")} description={t("admin.settingsDescription")} />
 
       <div className="space-y-6">
+        <section className="surface-card p-6">
+          <SectionHeader
+            title={t("admin.whatsappSection")}
+            description={t("admin.whatsappSectionDescription")}
+          />
+          <WhatsAppCard value={settings.whatsappNumber} />
+        </section>
+
         {GROUPS.map((group) => (
           <section key={group.id} className="surface-card p-6">
             <SectionHeader title={t(group.titleKey)} />
-            <SettingsForm
-              group={group.id}
-              fields={[...group.fields]}
-              values={settings as unknown as Record<string, string>}
-            />
+            <SettingsForm group={group.id} fields={[...group.fields]} values={values} />
           </section>
         ))}
       </div>
-
-      <p className="mt-6 text-xs text-faint">
-        {t("admin.commerce")}: {SETTING_GROUPS.commerce.join(", ")}
-      </p>
     </div>
   );
 }

@@ -123,6 +123,22 @@ export function normalizeWhatsApp(value: string): string {
   return (value || "").replace(/\D/g, "");
 }
 
+/**
+ * Human-readable rendering of an international number, e.g. `+212 786 172 756`.
+ *
+ * Used for display only — links are always built from `normalizeWhatsApp`, so
+ * spacing a number for readability can never break a `wa.me` URL. Numbers that
+ * are not a plausible length are echoed back untouched rather than mangled.
+ */
+export function formatWhatsApp(value: string): string {
+  const digits = normalizeWhatsApp(value);
+  if (digits.length < 8 || digits.length > 15) return value || "";
+
+  const head = digits.slice(0, digits.length - 8);
+  const rest = digits.slice(-8);
+  return `+${head} ${rest.slice(0, 4)} ${rest.slice(4)}`;
+}
+
 export function waLink(number: string, text?: string): string {
   const digits = normalizeWhatsApp(number);
   const base = `https://wa.me/${digits}`;

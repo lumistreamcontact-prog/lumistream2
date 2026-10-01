@@ -37,7 +37,7 @@ const SETTINGS = {
   glassIntensity: "0.12",
   fontFamily: "system",
   defaultLocale: "ar",
-  whatsappNumber: "212600000000",
+  whatsappNumber: "212786172756",
   supportEmail: "support@lumistream.example",
   phone: "",
   address: "",

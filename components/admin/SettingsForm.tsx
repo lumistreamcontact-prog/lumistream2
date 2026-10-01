@@ -13,6 +13,9 @@ export interface SettingField {
   options?: { value: string; label: string }[];
   span?: 1 | 2;
   required?: boolean;
+  /** Dictionary key rendered as helper text under the control. */
+  hintKey?: string;
+  placeholder?: string;
 }
 
 /**
@@ -80,12 +83,14 @@ export function SettingsForm({
 
           const type =
             field.kind === "number" ? "number" : field.kind === "color" ? "color" : "text";
+          const hint = field.hintKey ? t(field.hintKey) : undefined;
 
           return (
             <Field
               key={field.name}
               label={t(field.labelKey)}
               htmlFor={id}
+              hint={hint}
               className={span}
               required={field.required}
             >
@@ -95,6 +100,7 @@ export function SettingsForm({
                 type={type}
                 step={field.kind === "number" ? "0.01" : undefined}
                 defaultValue={value}
+                placeholder={field.placeholder}
                 required={field.required}
                 dir={field.kind === "url" ? "ltr" : undefined}
               />

@@ -25,7 +25,13 @@ export const SETTING_DEFAULTS = {
   fontFamily: "system",
   defaultLocale: "ar",
   /* Contact ---------------------------------------------------------- */
-  whatsappNumber: "212600000000",
+  /**
+   * International format, digits only (no `+`, spaces or dashes) — that is the
+   * form `waLink()` needs to build a valid `wa.me` URL. `NEXT_PUBLIC_WHATSAPP_NUMBER`
+   * lets a deployment override the fallback without a code change; anything saved
+   * from Admin > Settings lives in the `Setting` table and wins over both.
+   */
+  whatsappNumber: process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "212786172756",
   supportEmail: "support@lumistream.example",
   phone: "",
   address: "",
